@@ -22,41 +22,119 @@ Consensus Coder leverages multiple AI models to debate and reach consensus on co
 
 ## Installation
 
-### Via npm
+Choose your setup:
+
+### A. Standalone Command Line
+
+Use consensus-coder as a standalone CLI tool (no Clawdbot required):
 
 ```bash
-npm install @clawdbot/consensus-coder-skill
+# Clone the repo
+git clone https://github.com/bsharpe/consensus-coder.git
+cd consensus-coder
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Run interactively
+npm start -- --problem "Design a rate limiter"
+
+# Or use as CLI
+npx consensus-coder --problem "..." --wait --debug
 ```
 
-### Via Clawdbot Skill Manager
-
+**After consensus, generate the spec:**
 ```bash
-clawdbot skill install consensus-coder
+npm start -- --spec <debateId> --output my-spec.md
+
+# Then hand to any agent
+claude exec --file my-spec.md
+auggie --instruction-file my-spec.md
+pi --prompt "$(cat my-spec.md)"
 ```
 
-### From Source
+### B. Install for Clawdbot
+
+Add consensus-coder as a Clawdbot skill:
+
+**Option 1: Via npm (published package)**
+```bash
+# Coming soon — will be published to npm registry
+npm install @bsharpe/consensus-coder
+```
+
+**Option 2: From GitHub (current)**
+```bash
+# Install directly from GitHub repo
+npm install github:bsharpe/consensus-coder
+```
+
+**Option 3: Local development**
+```bash
+# In your Clawdbot workspace
+git clone https://github.com/bsharpe/consensus-coder.git skills/consensus-coder
+cd skills/consensus-coder
+npm install
+npm run build
+
+# Then register with Clawdbot
+clawdbot skill install ./skills/consensus-coder
+```
+
+**Verify installation:**
+```bash
+# Check that Clawdbot can find it
+clawdbot skill list | grep consensus-coder
+
+# Use from Clawdbot
+clawdbot skill run consensus-coder --problem "Design X"
+```
+
+### From Source (Any Setup)
 
 ```bash
-git clone https://github.com/clawdbot/consensus-coder-skill.git
-cd consensus-coder-skill
+git clone https://github.com/bsharpe/consensus-coder.git
+cd consensus-coder
 npm install
 npm run build
 ```
 
 ## Quick Start
 
-### Basic Usage
+### Standalone CLI (Fastest)
+
+Start a consensus debate and generate a spec, all from the command line:
+
+```bash
+# Start a debate (interactive)
+npm start -- --problem "Design an efficient algorithm to merge K sorted linked lists"
+
+# Wait for consensus... (shown in terminal)
+
+# Once converged, get the spec
+npm start -- --spec <debateId> --output merge-spec.md
+
+# Now use with any agent
+claude exec --file merge-spec.md
+```
+
+### Programmatic Usage (Full Control)
+
+Use as a library in your code:
 
 ```typescript
 import { ConsensusCoder } from '@clawdbot/consensus-coder-skill';
 
-// Initialize the skill
+// Initialize
 const coder = new ConsensusCoder({
   workspace: './debate-workspace',
-  debug: true,
+  debug: true, // See all votes and reasoning
 });
 
-// Start a new consensus debate
+// Start a debate
 const result = await coder.startConsensus({
   problem: 'Design an efficient algorithm to merge K sorted linked lists',
   context: {
@@ -69,16 +147,92 @@ console.log('Debate started:', result.debateId);
 
 // Poll for completion
 let status = await coder.getDebateStatus(result.debateId);
-while (status.status === 'in_progress') {
-  console.log(`Round ${status.iteration}: uncertainty=${status.uncertaintyLevel}`);
-  await new Promise(r => setTimeout(r, 5000)); // Wait 5s
+while (status.status !== 'converged' && status.status !== 'escalated') {
+  console.log(`Round ${status.iteration}: uncertainty=${status.uncertaintyLevel?.toFixed(2)}`);
+  await new Promise(r => setTimeout(r, 5000));
   status = await coder.getDebateStatus(result.debateId);
 }
 
-// Get final result
+// Get consensus result
 const finalResult = await coder.getConsensusResult(result.debateId);
-console.log('Winner:', finalResult.winningApproach);
-console.log('Confidence:', finalResult.confidence);
+console.log('✅ Winner:', finalResult.winningApproach);
+console.log('📊 Confidence:', (finalResult.confidence * 100).toFixed(0) + '%');
+
+// Generate markdown spec for implementation
+const spec = await coder.getConsensusSpec(result.debateId);
+console.log('\n📝 Consensus Spec:\n', spec);
+
+// Save for any agent to use
+import fs from 'fs';
+fs.writeFileSync('consensus-spec.md', spec);
+console.log('\n✨ Spec saved to consensus-spec.md');
+console.log('Ready to implement with: claude exec --file consensus-spec.md');
+```
+
+## Typical Workflows
+
+### Workflow A: Standalone CLI (One-Off)
+
+```bash
+# 1. Clone repo
+git clone https://github.com/bsharpe/consensus-coder.git
+cd consensus-coder
+npm install && npm run build
+
+# 2. Start a debate
+npm start -- --problem "Design a cache with O(1) get/put" --debug
+
+# Terminal shows:
+#   Round 1: Opus proposes 3 approaches
+#   Gemini votes...
+#   Codex votes...
+#   [continues until consensus]
+
+# 3. Generate spec when done
+npm start -- --spec <debateId> --output cache-spec.md
+
+# 4. Implement with any agent
+claude exec --file cache-spec.md
+# or
+auggie --instruction-file cache-spec.md
+```
+
+### Workflow B: Clawdbot Integration (Reusable)
+
+```bash
+# 1. Install as Clawdbot skill
+cd ~/my-clawdbot-workspace
+git clone https://github.com/bsharpe/consensus-coder.git skills/consensus-coder
+npm install -C skills/consensus-coder
+npm run build -C skills/consensus-coder
+
+# 2. Use from Clawdbot
+clawdbot skill run consensus-coder \
+  --problem "Design a rate limiter" \
+  --wait \
+  --spec my-rate-limiter-spec.md
+
+# 3. Clawdbot generates the spec, saves to file
+# 4. Your other tools consume it
+cat my-rate-limiter-spec.md | \
+  claude exec --
+```
+
+### Workflow C: Programmatic (Library Use)
+
+```typescript
+// In your own Node.js project
+import { ConsensusCoder } from '@clawdbot/consensus-coder-skill';
+
+const coder = new ConsensusCoder();
+const result = await coder.startConsensus({
+  problem: 'Your problem here',
+});
+
+// ... wait for consensus ...
+
+const spec = await coder.getConsensusSpec(result.debateId);
+// Use spec however you want
 ```
 
 ## Architecture
