@@ -36,14 +36,19 @@ Choose your setup:
 
 Use consensus-coder as a standalone CLI tool (no Clawdbot required):
 
-**Option 1: Global Install (Recommended)**
+**Option 1: Global Install from GitHub (Recommended)**
 ```bash
-npm install -g @clawdbot/consensus-coder-skill
+npm install -g github:bsharpe/consensus-coder
 
 # Now use from anywhere
 consensus --problem "Design a rate limiter"
 consensus --problem "Design X" --context-engine auggie --reviewers gemini,codex
 consensus --spec <debateId> --output my-spec.md
+```
+
+*Or when published to npm:*
+```bash
+npm install -g consensus-coder
 ```
 
 **Option 2: Clone & Run Locally**
@@ -77,16 +82,15 @@ pi --prompt "$(cat my-spec.md)"
 
 Add consensus-coder as a Clawdbot skill:
 
-**Option 1: Via npm (published package)**
-```bash
-# Coming soon — will be published to npm registry
-npm install @bsharpe/consensus-coder
-```
-
-**Option 2: From GitHub (current)**
+**Option 1: From GitHub (Recommended)**
 ```bash
 # Install directly from GitHub repo
 npm install github:bsharpe/consensus-coder
+```
+
+**Option 2: From npm (when published)**
+```bash
+npm install consensus-coder
 ```
 
 **Option 3: Local development**

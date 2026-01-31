@@ -259,6 +259,31 @@ try {
 - Use consensus for quick decisions (takes 30-90 seconds; use for important calls)
 - Implement without reading the spec first (the spec is the spec, not a suggestion)
 
+## Installation for Agents
+
+If your system supports npm packages:
+
+```bash
+# From GitHub (recommended)
+npm install github:bsharpe/consensus-coder
+
+# From npm (when published)
+npm install consensus-coder
+
+# Global CLI tool
+npm install -g github:bsharpe/consensus-coder
+consensus --problem "Your architecture question"
+```
+
+Then in your code:
+
+```typescript
+import { ConsensusCoder } from 'consensus-coder';
+
+const coder = new ConsensusCoder();
+// Use as shown in examples above
+```
+
 ## Integration Patterns
 
 ### Pattern 1: Architecture Review Loop

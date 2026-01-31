@@ -1,7 +1,7 @@
 {
-  "name": "@clawdbot/consensus-coder-skill",
-  "version": "1.0.0",
-  "description": "Multi-model consensus coding workflow - orchestrated AI deliberation for generating high-quality code through structured debate",
+  "name": "consensus-coder",
+  "version": "1.2.0",
+  "description": "Consensus-driven multi-tool AI orchestration for coding decisions. Combines context engines (Auggie, Claude Code, Pi) with reviewers (Gemini, Codex) to debate and reach consensus on architecture and design.",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
