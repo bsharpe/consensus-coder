@@ -55,6 +55,8 @@
     "dist",
     "bin",
     "README.md",
+    "AGENT_GUIDE.md",
+    "SKILL.md",
     "LICENSE"
   ],
   "repository": {

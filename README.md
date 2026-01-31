@@ -13,14 +13,20 @@ The system is **tool-agnostic**: you choose which tools participate (Auggie, Cla
 
 ### Key Features
 
-- 🤖 **Multi-Model Orchestration** — Coordinates multiple AI models in structured debate
-- 🎯 **Consensus-Driven** — Iterates until models agree (or escalates for human review)
+- 🤖 **Multi-Tool Orchestration** — Coordinates multiple AI coding tools in structured debate
+- 🎯 **Consensus-Driven** — Iterates until tools agree (or escalates for human review)
 - 💾 **State Persistence** — Full debate state saved to disk for recovery and audit
 - 🔄 **Automatic Retry** — Handles transient failures and rate limits gracefully
 - 📝 **Consensus Spec Output** — Generates detailed markdown specification ready for any coding agent
 - 📊 **Comprehensive Logging** — Track every decision point and voting outcome
-- ⚙️ **Highly Configurable** — Tune debate rounds, voting thresholds, timeouts
-- 🎁 **Agent-Agnostic** — Output spec works with Claude Code, Auggie, Pi, Codex, or any coding agent
+- ⚙️ **Highly Configurable** — Tune debate rounds, voting thresholds, tool selection, voting weights
+- 🎁 **Agent-Agnostic** — Works with Claude Code, Auggie, Pi, Codex, or any coding agent
+
+## Documentation
+
+- **[AGENT_GUIDE.md](AGENT_GUIDE.md)** — For AI agents: how to use this tool effectively, when to use it, common patterns
+- **README.md** (this file) — Installation, API reference, configuration, examples
+- **SKILL.md** — Skill description and quick reference
 
 ## Installation
 
