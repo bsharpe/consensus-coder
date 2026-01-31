@@ -28,6 +28,49 @@ The system is **tool-agnostic**: you choose which tools participate (Auggie, Cla
 - **README.md** (this file) — Installation, API reference, configuration, examples
 - **SKILL.md** — Skill description and quick reference
 
+## Prerequisites
+
+Consensus Coder orchestrates AI coding tools, so you'll need to have your chosen tools installed and working first.
+
+**Required:**
+- **Node.js** 18+ (to run consensus-coder itself)
+- **npm** (to install dependencies)
+
+**Tool-Specific Prerequisites:**
+
+| Tool | How to Set Up | Used For |
+|------|---------------|----------|
+| **Auggie** | `npm install -g @augmentcode/cli` | Context engine (codebase analysis) |
+| **Claude Code** | Install via `claude code` CLI | Context or reviewer |
+| **Gemini** | `GOOGLE_AI_STUDIO_API_KEY` env var | Reviewer (analysis) |
+| **Codex/OpenAI** | `OPENAI_API_KEY` env var | Reviewer (code-specific analysis) |
+| **Pi** | `pi` CLI installed | Context or reviewer |
+| **OpenCode** | Your custom setup | Any role |
+
+**Minimal Setup (Recommended for Beginners):**
+```bash
+# Install Node.js
+# Then install Auggie (context engine)
+npm install -g @augmentcode/cli
+
+# Set API keys for reviewers
+export GOOGLE_AI_STUDIO_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here
+
+# Now consensus-coder can use Auggie + Gemini + Codex
+```
+
+**Check Prerequisites:**
+```bash
+node --version        # Should be 18+
+npm --version         # Should be 6+
+auggie --version      # If using Auggie
+which pi              # If using Pi
+echo $OPENAI_API_KEY  # If using OpenAI/Codex
+```
+
+If any tools are missing, install them before running consensus-coder.
+
 ## Installation
 
 Choose your setup:
