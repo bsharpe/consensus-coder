@@ -259,9 +259,46 @@ interface ConsensusCoderConfig {
 }
 ```
 
-## Configuration
+## API Keys & Authentication
 
-### Environment Variables
+Consensus Coder requires API keys to access the three models (Claude Opus, Gemini, Codex). You can use **direct API keys** or **OpenRouter** (which proxies multiple providers with a single API key).
+
+### Option 1: Direct API Keys (Recommended for Production)
+
+Required API keys:
+
+| Model | Provider | Required? | How to Get |
+|-------|----------|-----------|-----------|
+| **Claude Opus** | Anthropic | ✅ Yes | https://console.anthropic.com → API Keys |
+| **Gemini** | Google AI | ✅ Yes | https://aistudio.google.com → Get API Key |
+| **Codex** | OpenAI | ✅ Yes | https://platform.openai.com → API Keys |
+
+**Environment variables:**
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_AI_API_KEY=gsk-...
+OPENAI_API_KEY=sk-...
+```
+
+### Option 2: OpenRouter (Simpler Setup)
+
+OpenRouter is a proxy that handles multiple AI providers with a single API key. Useful for testing, cost management, or if you don't have all individual keys.
+
+**Setup:**
+1. Create an account at https://openrouter.ai
+2. Get your API key from settings
+3. Set environment variable:
+   ```bash
+   OPENROUTER_API_KEY=sk-or-...
+   ```
+
+**Cost:** OpenRouter charges per token + 10-20% markup on direct prices. Useful for trying out without setting up individual accounts.
+
+**Limitation:** OpenRouter may have rate limits or model availability — verify it supports the models you need.
+
+### Configuration
+
+#### Environment Variables
 
 Create a `.env` file (copy from `.env.example`):
 
@@ -269,10 +306,13 @@ Create a `.env` file (copy from `.env.example`):
 # Clawdbot
 CLAWDBOT_WORKSPACE=~/.clawdbot
 
-# API Keys (if using external models)
-ANTHROPIC_API_KEY=sk-...
-GOOGLE_AI_API_KEY=sk-...
-OPENAI_API_KEY=sk-...
+# OPTION 1: Direct API Keys
+# ANTHROPIC_API_KEY=sk-ant-...
+# GOOGLE_AI_API_KEY=gsk-...
+# OPENAI_API_KEY=sk-...
+
+# OPTION 2: OpenRouter (alternative)
+OPENROUTER_API_KEY=sk-or-...
 
 # Debate Configuration
 CONSENSUS_MAX_ROUNDS=5
@@ -285,10 +325,11 @@ CONSENSUS_PERSISTENCE_DIR=~/.clawdbot/consensus-coder/debates
 CONSENSUS_RETENTION_DAYS=30
 ```
 
-### Config File
+#### Config File
 
 Edit `consensus-coder.config.json`:
 
+**Using Direct API Keys:**
 ```json
 {
   "maxRounds": 5,
@@ -302,8 +343,31 @@ Edit `consensus-coder.config.json`:
   "roundTimeoutMs": 60000,
   "models": {
     "diagnosis": "claude-opus",
-    "reviewer1": "gemini-pro",
-    "reviewer2": "gpt-4"
+    "reviewer1": "gemini-2.5-pro",
+    "reviewer2": "gpt-4-turbo"
+  },
+  "persistenceDir": "~/.clawdbot/consensus-coder/debates",
+  "retentionDays": 30
+}
+```
+
+**Using OpenRouter (alternative):**
+```json
+{
+  "maxRounds": 5,
+  "convergenceThreshold": 0.85,
+  "votingWeights": {
+    "gemini": 1.0,
+    "codex": 1.0,
+    "opus": 1.5
+  },
+  "debateTimeoutMs": 300000,
+  "roundTimeoutMs": 60000,
+  "authProvider": "openrouter",
+  "models": {
+    "diagnosis": "anthropic/claude-opus-4-1",
+    "reviewer1": "google/gemini-2.5-pro",
+    "reviewer2": "openai/gpt-4-turbo"
   },
   "persistenceDir": "~/.clawdbot/consensus-coder/debates",
   "retentionDays": 30
@@ -513,6 +577,36 @@ class CustomPlanGenerator extends ImplementationPlanGenerator {
 
 ## Troubleshooting
 
+### Authentication Errors
+
+**Symptom**: `401 Unauthorized` or `Invalid API key`
+
+**Solution**:
+1. Verify API keys are set in `.env`:
+   ```bash
+   echo $ANTHROPIC_API_KEY  # Should not be empty
+   echo $OPENROUTER_API_KEY
+   ```
+2. Check key format:
+   - Anthropic: `sk-ant-...` (not `sk-...`)
+   - Google: `gsk-...`
+   - OpenAI: `sk-...`
+   - OpenRouter: `sk-or-...`
+3. Ensure `.env` file is in the working directory (or project root)
+4. Regenerate keys if they've been compromised
+
+### Model Not Available
+
+**Symptom**: `Model not found` or `Model unavailable`
+
+**Solution**:
+1. Verify model names match provider conventions:
+   - Anthropic: `claude-opus-4-1`, `claude-3-sonnet`
+   - Google: `gemini-2.5-pro`, `gemini-1.5-pro`
+   - OpenAI: `gpt-4-turbo`, `gpt-4o`
+2. If using OpenRouter, check model availability: https://openrouter.ai/docs/models
+3. For newer models, update model names in `consensus-coder.config.json`
+
 ### Debates Not Converging
 
 **Symptom**: Debates hit max rounds without consensus
@@ -530,7 +624,7 @@ class CustomPlanGenerator extends ImplementationPlanGenerator {
 **Solution**:
 1. Increase `debateTimeoutMs` and `roundTimeoutMs`
 2. Check network connectivity
-3. Monitor API rate limits
+3. Monitor API rate limits (OpenRouter has strict limits)
 4. Enable debug mode to see which round times out
 
 ### State Corruption
