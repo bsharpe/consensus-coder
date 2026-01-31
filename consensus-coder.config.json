@@ -1,0 +1,36 @@
+{
+  "skillId": "consensus-coder",
+  "version": "1.0.0",
+  "description": "Multi-model consensus coding workflow - debate system for generating high-quality code through orchestrated AI deliberation",
+  "maxDebates": 100,
+  "maxRounds": 5,
+  "votingThreshold": 75,
+  "uncertaintyThreshold": 30,
+  "requestTimeout": 60000,
+  "retryConfig": {
+    "maxRetries": 3,
+    "baseDelayMs": 1000,
+    "maxDelayMs": 60000,
+    "backoffMultiplier": 2
+  },
+  "auggie": {
+    "path": "auggie",
+    "timeout": 300000
+  },
+  "models": {
+    "opus": "anthropic/claude-opus-4-5",
+    "gemini": "google/gemini-2-5-flash",
+    "codex": "anthropic/claude-opus-4-5"
+  },
+  "persistence": {
+    "basePath": "~/.clawdbot/consensus-debates",
+    "maxDebatesKept": 100,
+    "autoCleanupDaysOld": 30,
+    "atomicWrites": true
+  },
+  "logging": {
+    "level": "info",
+    "format": "text",
+    "outputPath": "~/.clawdbot/consensus-coder/logs"
+  }
+}

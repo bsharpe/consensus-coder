@@ -1,0 +1,65 @@
+{
+  "name": "@clawdbot/consensus-coder-skill",
+  "version": "1.0.0",
+  "description": "Multi-model consensus coding workflow - orchestrated AI deliberation for generating high-quality code through structured debate",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "consensus-coder-cli": "bin/consensus-coder-cli.js"
+  },
+  "author": "Claude Opus (architecture) & Auggie (implementation)",
+  "keywords": [
+    "clawdbot",
+    "skill",
+    "consensus",
+    "ai",
+    "coding",
+    "orchestration",
+    "debate",
+    "multi-model"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:clean": "rm -rf dist && tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "tsc --noEmit",
+    "start": "node dist/cli/consensus-coder-cli.js",
+    "dev": "ts-node src/cli/consensus-coder-cli.ts",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "table": "^6.9.0",
+    "uuid": "^9.0.0",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^25.1.0",
+    "@types/uuid": "^9.0.0",
+    "@types/yargs": "^17.0.35",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clawdbot/consensus-coder-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/clawdbot/consensus-coder-skill/issues"
+  },
+  "homepage": "https://github.com/clawdbot/consensus-coder-skill#readme"
+}
