@@ -15,9 +15,10 @@ Consensus Coder leverages multiple AI models to debate and reach consensus on co
 - 🎯 **Consensus-Driven** — Iterates until models agree (or escalates for human review)
 - 💾 **State Persistence** — Full debate state saved to disk for recovery and audit
 - 🔄 **Automatic Retry** — Handles transient failures and rate limits gracefully
-- 🛠️ **Implementation Execution** — Converts consensus decisions into working code via Auggie
+- 📝 **Consensus Spec Output** — Generates detailed markdown specification ready for any coding agent
 - 📊 **Comprehensive Logging** — Track every decision point and voting outcome
 - ⚙️ **Highly Configurable** — Tune debate rounds, voting thresholds, timeouts
+- 🎁 **Agent-Agnostic** — Output spec works with Claude Code, Auggie, Pi, Codex, or any coding agent
 
 ## Installation
 
@@ -90,8 +91,7 @@ console.log('Confidence:', finalResult.confidence);
 | **SynthesisEngine** | Aggregates model votes and scores approaches |
 | **StateStore** | Persists debate state to disk for recovery |
 | **RetryOrchestrator** | Handles transient failures and rate limits |
-| **ImplementationPlanGenerator** | Converts consensus decisions to actionable tasks |
-| **AuggieRelay** | Executes implementation tasks via Auggie agent |
+| **SpecGenerator** | Converts consensus results to markdown spec documents |
 
 ### Workflow
 
@@ -103,7 +103,7 @@ graph TD
     
     D --> E["🔍 Gemini Reviews<br/>Approach A, B, C"]
     E --> F["🔍 Codex Reviews<br/>Approach A, B, C"]
-    F --> G["📊 Synthesis Engine<br/>Calculate TF-IDF Scores<br/>Determine Winner"]
+    F --> G["📊 Synthesis Engine<br/>Calculate Confidence<br/>Score Approaches"]
     
     G --> H{{"Uncertainty<br/>Below Threshold?"}}
     H -->|Yes| D
@@ -112,15 +112,25 @@ graph TD
     I -->|Yes| J["✅ Converged"]
     I -->|No| K["⚠️ Escalate to Human"]
     
-    J --> L["📝 Implementation Plan<br/>Generator"]
-    K --> M["👤 Waiting for Decision"]
-    M --> L
+    K --> M["👤 Human Review<br/>& Decision"]
+    M --> J
     
-    L --> N["🔨 Auggie Implementation<br/>Execute Tasks in Order"]
-    N --> O["💾 Generated Code"]
+    J --> L["📝 Generate Consensus Spec<br/>Markdown Document"]
     
-    O --> P["📊 Report & Archive"]
-    P --> Q["✨ Done"]
+    L --> N["📄 Spec Output<br/>Problem + All Approaches<br/>+ Winner + Acceptance Criteria"]
+    
+    N --> O{{"Choose Agent"}}
+    O -->|Claude Code| P["claude exec --file spec.md"]
+    O -->|Auggie| Q["auggie --instruction-file spec.md"]
+    O -->|Pi Agent| R["pi --prompt spec.md"]
+    O -->|Any Other| S["Feed to your agent"]
+    
+    P --> T["🔨 Implementation"]
+    Q --> T
+    R --> T
+    S --> T
+    
+    T --> U["✨ Done"]
 ```
 
 ## API Reference
@@ -213,26 +223,77 @@ Retrieve the final consensus result.
 }
 ```
 
-##### executeImplementation
+##### getConsensusSpec
 
 ```typescript
-executeImplementation(
-  debateId: string,
-  options?: ImplementationOptions
-): Promise<ImplementationResult>
+getConsensusSpec(debateId: string): Promise<string>
 ```
 
-Convert the winning approach into an implementation plan and execute it via Auggie.
+Generate a detailed markdown specification document from the consensus result. This spec can be handed to any coding agent for implementation.
 
-**Returns:**
-```typescript
-{
-  debateId: string;
-  status: 'success' | 'partial' | 'failed';
-  generatedCode: string;
-  generatedFiles: string[];
-  executionTimeMs: number;
-}
+**Returns:** Markdown string with:
+- Problem statement & context
+- All 3 proposed approaches with pros/cons
+- Voting history & reasoning
+- Winning approach with full explanation
+- Acceptance criteria
+- Implementation guidelines
+- Example skeleton code (if applicable)
+
+**Example output:**
+```markdown
+# Consensus Spec: [Problem Title]
+
+## Problem Statement
+[Detailed problem description]
+
+## Context & Constraints
+- [Constraint 1]
+- [Constraint 2]
+
+## Proposed Approaches
+
+### Approach A: [Name]
+**Pros:**
+- [Pro 1]
+
+**Cons:**
+- [Con 1]
+
+### Approach B: [Name]
+...
+
+## Consensus Decision
+**Winner:** Approach [X]
+**Confidence:** 92%
+
+**Why:** [Detailed explanation of voting and reasoning]
+
+## Acceptance Criteria
+- [ ] [Criterion 1]
+- [ ] [Criterion 2]
+
+## Implementation Guidelines
+[Specific technical guidance]
+
+## Example Skeleton
+\`\`\`typescript
+// Your code here
+\`\`\`
+```
+
+**Usage:** Pass this markdown to any coding agent:
+```bash
+# Using Claude Code
+claude exec --file consensus-spec.md
+
+# Using Auggie
+auggie --print --instruction-file consensus-spec.md
+
+# Using Pi Coding Agent
+pi --prompt "Implement this spec: $(cat consensus-spec.md)"
+
+# Or any other agent...
 ```
 
 ### Type: ConsensusCoderConfig
@@ -394,17 +455,25 @@ const result = await coder.startConsensus({
   },
 });
 
-// Wait for completion
+// Wait for consensus
 let status = await coder.getDebateStatus(result.debateId);
-while (status.status !== 'converged') {
-  console.log(`Round ${status.iteration}...`);
-  await new Promise(r => setTimeout(r, 10000));
+while (status.status !== 'converged' && status.status !== 'escalated') {
+  console.log(`Round ${status.iteration}, uncertainty: ${status.uncertaintyLevel}`);
+  await new Promise(r => setTimeout(r, 5000));
   status = await coder.getDebateStatus(result.debateId);
 }
 
-// Execute the winning solution
-const impl = await coder.executeImplementation(result.debateId);
-console.log('Generated code:\n', impl.generatedCode);
+// Get the consensus spec (markdown document)
+const spec = await coder.getConsensusSpec(result.debateId);
+
+// Save it
+import fs from 'fs';
+fs.writeFileSync('bst-spec.md', spec);
+
+// Now hand it to any coding agent
+console.log('Spec ready for implementation! Use any agent:');
+console.log('  claude exec --file bst-spec.md');
+console.log('  auggie --instruction-file bst-spec.md');
 ```
 
 ### Example 2: Refactor Existing Code
@@ -434,12 +503,22 @@ const result = await coder.startConsensus({
   },
 });
 
-// ... wait for consensus ...
+// Wait for consensus
+let status = await coder.getDebateStatus(result.debateId);
+while (status.status !== 'converged' && status.status !== 'escalated') {
+  await new Promise(r => setTimeout(r, 5000));
+  status = await coder.getDebateStatus(result.debateId);
+}
 
-const impl = await coder.executeImplementation(result.debateId);
+// Get consensus spec and use with your preferred agent
+const spec = await coder.getConsensusSpec(result.debateId);
+fs.writeFileSync('sort-refactor-spec.md', spec);
+
+// Share with team or pass to implementation
+console.log(spec);
 ```
 
-### Example 3: Architecture Decision
+### Example 3: Architecture Decision (with Human Review)
 
 ```typescript
 const coder = new ConsensusCoder({
@@ -458,20 +537,32 @@ const result = await coder.startConsensus({
   },
 });
 
-// Poll with shorter interval to see voting in action
-for (let i = 0; i < 30; i++) {
+// Poll and monitor the debate
+for (let i = 0; i < 50; i++) {
   const status = await coder.getDebateStatus(result.debateId);
-  console.log(`[${new Date().toISOString()}] Round ${status.iteration}: `
-    + `uncertainty=${status.uncertaintyLevel?.toFixed(2)}`);
+  console.log(`Round ${status.iteration}: uncertainty=${status.uncertaintyLevel?.toFixed(2)}`);
   
-  if (status.status !== 'in_progress') break;
-  await new Promise(r => setTimeout(r, 2000));
+  if (status.status === 'converged') {
+    console.log('✅ Converged!');
+    break;
+  }
+  if (status.status === 'escalated') {
+    console.log('⚠️ Need human review');
+    break;
+  }
+  
+  await new Promise(r => setTimeout(r, 3000));
 }
 
+// Generate final spec regardless of escalation
 const finalResult = await coder.getConsensusResult(result.debateId);
 console.log('\nWinning Approach:', finalResult.winningApproach);
 console.log('Confidence:', (finalResult.confidence * 100).toFixed(1) + '%');
-console.log('Votes:', finalResult.votes);
+
+const spec = await coder.getConsensusSpec(result.debateId);
+fs.writeFileSync('lru-cache-spec.md', spec);
+
+// Spec is ready for any agent to implement
 ```
 
 ## CLI Usage
@@ -479,17 +570,23 @@ console.log('Votes:', finalResult.votes);
 The skill includes a CLI for interactive use:
 
 ```bash
-# Start interactive consensus on a problem
+# Start consensus debate on a problem
 npm start -- --problem "Design a rate limiter"
 
-# Check status of an existing debate
+# Check status of an ongoing debate
 npm start -- --status <debateId>
 
-# Get final result
+# Get consensus result summary
 npm start -- --result <debateId>
 
-# Run in debug mode
+# Generate markdown spec from consensus
+npm start -- --spec <debateId> --output rate-limiter-spec.md
+
+# Run in debug mode (see all votes)
 npm start -- --problem "..." --debug
+
+# List all recent debates
+npm start -- --list
 
 # Show version
 npm start -- --version
@@ -655,6 +752,14 @@ MIT — See [LICENSE](LICENSE) for details.
 
 ## Changelog
 
+### v1.1.0 (2026-01-31)
+
+- ✨ **Breaking Change:** Output is now markdown spec documents instead of direct Auggie integration
+- ✅ Agent-agnostic spec generation (works with Claude Code, Auggie, Pi, Codex, etc.)
+- ✅ More portable for standalone use
+- ✅ Updated README with new workflow
+- ✅ Expanded examples showing spec-based usage
+
 ### v1.0.0 (2024-01-30)
 
 - ✅ Initial release
@@ -662,10 +767,9 @@ MIT — See [LICENSE](LICENSE) for details.
 - ✅ Consensus-driven debate
 - ✅ State persistence
 - ✅ Automatic retry handling
-- ✅ Implementation execution via Auggie
 - ✅ CLI interface
 - ✅ Comprehensive testing
 
 ---
 
-**Built with ❤️ by Claude Opus (architecture) and Auggie (implementation)**
+**Built with ❤️ by Claude Opus, Gemini, and Codex (consensus) and the community**
