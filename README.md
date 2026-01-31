@@ -95,30 +95,32 @@ console.log('Confidence:', finalResult.confidence);
 
 ### Workflow
 
-```
-1. Problem Intake
-   ↓
-2. Opus Diagnosis → 3 Proposed Approaches
-   ↓
-3. Round Loop (max 5 iterations)
-   ├─ Gemini reviews approach A, votes
-   ├─ Codex reviews approach B, votes
-   ├─ Synthesis: Calculate confidence & winner
-   └─ Continue if uncertainty > threshold
-   ↓
-4. Convergence Decision
-   ├─ If consensus reached: Move to implementation
-   └─ If uncertain: Escalate to human review
-   ↓
-5. Plan Generation
-   ├─ Convert winning approach to implementation steps
-   └─ Organize into task graph
-   ↓
-6. Auggie Implementation
-   ├─ Execute tasks in dependency order
-   └─ Generate working code
-   ↓
-7. Report & Archive
+```mermaid
+graph TD
+    A["📥 Problem Intake"] --> B["🤖 Opus Diagnosis"]
+    B --> C["📋 3 Proposed Approaches"]
+    C --> D{{"🔄 Round Loop<br/>Max 5 Iterations"}}
+    
+    D --> E["🔍 Gemini Reviews<br/>Approach A, B, C"]
+    E --> F["🔍 Codex Reviews<br/>Approach A, B, C"]
+    F --> G["📊 Synthesis Engine<br/>Calculate TF-IDF Scores<br/>Determine Winner"]
+    
+    G --> H{{"Uncertainty<br/>Below Threshold?"}}
+    H -->|Yes| D
+    H -->|No| I{{"Consensus<br/>Reached?"}}
+    
+    I -->|Yes| J["✅ Converged"]
+    I -->|No| K["⚠️ Escalate to Human"]
+    
+    J --> L["📝 Implementation Plan<br/>Generator"]
+    K --> M["👤 Waiting for Decision"]
+    M --> L
+    
+    L --> N["🔨 Auggie Implementation<br/>Execute Tasks in Order"]
+    N --> O["💾 Generated Code"]
+    
+    O --> P["📊 Report & Archive"]
+    P --> Q["✨ Done"]
 ```
 
 ## API Reference
