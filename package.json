@@ -6,6 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "consensus": "bin/consensus.js",
+    "consensus-coder": "bin/consensus-coder-cli.js",
     "consensus-coder-cli": "bin/consensus-coder-cli.js"
   },
   "author": "Claude Opus (architecture) & Auggie (implementation)",
@@ -51,6 +53,7 @@
   },
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],

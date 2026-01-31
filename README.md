@@ -30,6 +30,17 @@ Choose your setup:
 
 Use consensus-coder as a standalone CLI tool (no Clawdbot required):
 
+**Option 1: Global Install (Recommended)**
+```bash
+npm install -g @clawdbot/consensus-coder-skill
+
+# Now use from anywhere
+consensus --problem "Design a rate limiter"
+consensus --problem "Design X" --context-engine auggie --reviewers gemini,codex
+consensus --spec <debateId> --output my-spec.md
+```
+
+**Option 2: Clone & Run Locally**
 ```bash
 # Clone the repo
 git clone https://github.com/bsharpe/consensus-coder.git
@@ -43,14 +54,12 @@ npm run build
 
 # Run interactively
 npm start -- --problem "Design a rate limiter"
-
-# Or use as CLI
-npx consensus-coder --problem "..." --wait --debug
 ```
 
 **After consensus, generate the spec:**
 ```bash
-npm start -- --spec <debateId> --output my-spec.md
+# Get the spec from a debate
+consensus --spec <debateId> --output my-spec.md
 
 # Then hand to any agent
 claude exec --file my-spec.md
@@ -810,32 +819,53 @@ fs.writeFileSync('lru-cache-spec.md', spec);
 
 ## CLI Usage
 
-The skill includes a CLI for interactive use:
+The skill includes a CLI for interactive use. After installation, you can use the `consensus` command:
+
+### Quick Start (Preferred)
 
 ```bash
 # Start consensus debate on a problem
-npm start -- --problem "Design a rate limiter"
+consensus --problem "Design a rate limiter"
 
 # Check status of an ongoing debate
-npm start -- --status <debateId>
+consensus --status <debateId>
 
 # Get consensus result summary
-npm start -- --result <debateId>
+consensus --result <debateId>
 
 # Generate markdown spec from consensus
-npm start -- --spec <debateId> --output rate-limiter-spec.md
+consensus --spec <debateId> --output rate-limiter-spec.md
 
 # Run in debug mode (see all votes)
-npm start -- --problem "..." --debug
+consensus --problem "..." --debug
 
 # List all recent debates
-npm start -- --list
+consensus --list
 
 # Show version
-npm start -- --version
+consensus --version
 
 # Show help
-npm start -- --help
+consensus --help
+```
+
+### Alternative Commands
+
+If you prefer longer command names or have name conflicts:
+
+```bash
+# These all do the same thing as `consensus`
+consensus-coder --problem "Design X"
+consensus-coder-cli --problem "Design X"
+```
+
+### From Package Root (Development)
+
+If running from the source directory:
+
+```bash
+npm start -- --problem "Design a rate limiter"
+npx ts-node src/cli/consensus-coder-cli.ts --problem "Design X"
 ```
 
 ## Testing
