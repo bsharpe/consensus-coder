@@ -261,27 +261,36 @@ try {
 
 ## Installation for Agents
 
-If your system supports npm packages:
+Currently available via GitHub (not published to npm yet):
 
 ```bash
-# From GitHub (recommended)
-npm install github:bsharpe/consensus-coder
+# Clone the repository
+git clone https://github.com/bsharpe/consensus-coder.git
+cd consensus-coder
 
-# From npm (when published)
-npm install consensus-coder
+# Install and build
+npm install
+npm run build
 
-# Global CLI tool
-npm install -g github:bsharpe/consensus-coder
-consensus --problem "Your architecture question"
+# Use from CLI
+npm start -- --problem "Your architecture question"
+
+# Or import in your code
 ```
 
-Then in your code:
+**In your Node.js/TypeScript code:**
 
 ```typescript
-import { ConsensusCoder } from 'consensus-coder';
+import { ConsensusCoder } from './path/to/consensus-coder/dist/index.js';
 
 const coder = new ConsensusCoder();
 // Use as shown in examples above
+```
+
+**Future:** When published to npm:
+```bash
+npm install consensus-coder
+import { ConsensusCoder } from 'consensus-coder';
 ```
 
 ## Integration Patterns

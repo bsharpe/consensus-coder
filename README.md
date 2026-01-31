@@ -36,22 +36,7 @@ Choose your setup:
 
 Use consensus-coder as a standalone CLI tool (no Clawdbot required):
 
-**Option 1: Global Install from GitHub (Recommended)**
-```bash
-npm install -g github:bsharpe/consensus-coder
-
-# Now use from anywhere
-consensus --problem "Design a rate limiter"
-consensus --problem "Design X" --context-engine auggie --reviewers gemini,codex
-consensus --spec <debateId> --output my-spec.md
-```
-
-*Or when published to npm:*
-```bash
-npm install -g consensus-coder
-```
-
-**Option 2: Clone & Run Locally**
+**Option 1: Clone & Use Locally**
 ```bash
 # Clone the repo
 git clone https://github.com/bsharpe/consensus-coder.git
@@ -63,14 +48,14 @@ npm install
 # Build the project
 npm run build
 
-# Run interactively
+# Now use the consensus command
 npm start -- --problem "Design a rate limiter"
 ```
 
 **After consensus, generate the spec:**
 ```bash
 # Get the spec from a debate
-consensus --spec <debateId> --output my-spec.md
+npm start -- --spec <debateId> --output my-spec.md
 
 # Then hand to any agent
 claude exec --file my-spec.md
@@ -78,40 +63,34 @@ auggie --instruction-file my-spec.md
 pi --prompt "$(cat my-spec.md)"
 ```
 
-### B. Install for Clawdbot
+### B. Use with Clawdbot
 
 Add consensus-coder as a Clawdbot skill:
 
-**Option 1: From GitHub (Recommended)**
-```bash
-# Install directly from GitHub repo
-npm install github:bsharpe/consensus-coder
-```
-
-**Option 2: From npm (when published)**
-```bash
-npm install consensus-coder
-```
-
-**Option 3: Local development**
 ```bash
 # In your Clawdbot workspace
 git clone https://github.com/bsharpe/consensus-coder.git skills/consensus-coder
 cd skills/consensus-coder
 npm install
 npm run build
+```
 
-# Then register with Clawdbot
+Then use from Clawdbot:
+```bash
+# Register the skill
 clawdbot skill install ./skills/consensus-coder
+
+# Use it
+clawdbot skill run consensus-coder --problem "Design X"
+
+# Or from another Clawdbot agent
+import { ConsensusCoder } from './skills/consensus-coder/dist/index.js';
+const coder = new ConsensusCoder();
 ```
 
 **Verify installation:**
 ```bash
-# Check that Clawdbot can find it
 clawdbot skill list | grep consensus-coder
-
-# Use from Clawdbot
-clawdbot skill run consensus-coder --problem "Design X"
 ```
 
 ### From Source (Any Setup)
@@ -829,52 +808,43 @@ fs.writeFileSync('lru-cache-spec.md', spec);
 
 ## CLI Usage
 
-The skill includes a CLI for interactive use. After installation, you can use the `consensus` command:
-
-### Quick Start (Preferred)
+From within the project directory:
 
 ```bash
 # Start consensus debate on a problem
-consensus --problem "Design a rate limiter"
+npm start -- --problem "Design a rate limiter"
+
+# With tool configuration
+npm start -- --problem "Design X" \
+  --use-adapters \
+  --context-engine auggie \
+  --reviewers gemini,codex
 
 # Check status of an ongoing debate
-consensus --status <debateId>
+npm start -- --status <debateId>
 
 # Get consensus result summary
-consensus --result <debateId>
+npm start -- --result <debateId>
 
 # Generate markdown spec from consensus
-consensus --spec <debateId> --output rate-limiter-spec.md
+npm start -- --spec <debateId> --output rate-limiter-spec.md
 
 # Run in debug mode (see all votes)
-consensus --problem "..." --debug
+npm start -- --problem "..." --debug
 
 # List all recent debates
-consensus --list
+npm start -- --list
 
 # Show version
-consensus --version
+npm start -- --version
 
 # Show help
-consensus --help
+npm start -- --help
 ```
 
-### Alternative Commands
-
-If you prefer longer command names or have name conflicts:
+### Development (TypeScript)
 
 ```bash
-# These all do the same thing as `consensus`
-consensus-coder --problem "Design X"
-consensus-coder-cli --problem "Design X"
-```
-
-### From Package Root (Development)
-
-If running from the source directory:
-
-```bash
-npm start -- --problem "Design a rate limiter"
 npx ts-node src/cli/consensus-coder-cli.ts --problem "Design X"
 ```
 
