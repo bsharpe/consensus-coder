@@ -36,7 +36,8 @@ Choose your setup:
 
 Use consensus-coder as a standalone CLI tool (no Clawdbot required):
 
-**Option 1: Clone & Use Locally**
+**Clone & Use Locally**
+
 ```bash
 # Clone the repo
 git clone https://github.com/bsharpe/consensus-coder.git
@@ -48,16 +49,13 @@ npm install
 # Build the project
 npm run build
 
-# Now use the consensus command
+# Start a consensus debate
 npm start -- --problem "Design a rate limiter"
-```
 
-**After consensus, generate the spec:**
-```bash
-# Get the spec from a debate
+# Generate spec when done
 npm start -- --spec <debateId> --output my-spec.md
 
-# Then hand to any agent
+# Hand to any implementation agent
 claude exec --file my-spec.md
 auggie --instruction-file my-spec.md
 pi --prompt "$(cat my-spec.md)"

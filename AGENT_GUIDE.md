@@ -287,12 +287,6 @@ const coder = new ConsensusCoder();
 // Use as shown in examples above
 ```
 
-**Future:** When published to npm:
-```bash
-npm install consensus-coder
-import { ConsensusCoder } from 'consensus-coder';
-```
-
 ## Integration Patterns
 
 ### Pattern 1: Architecture Review Loop
