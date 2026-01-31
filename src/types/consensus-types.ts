@@ -1071,7 +1071,59 @@ export interface ConsensusCoderConfig {
     gemini: { model: string; temperature: number };
     codex: { model: string; temperature: number };
   };
+  /**
+   * Optional tools configuration.
+   * If not provided, defaults are used.
+   */
+  tools?: ToolsConfig;
 }
+
+/**
+ * Configuration for coding tools in the consensus system.
+ *
+ * @interface ToolsConfig
+ */
+export interface ToolsConfig {
+  /**
+   * Preferred context engine that generates solutions.
+   * This tool has codebase context access and generates the initial solutions.
+   * Default: 'auggie'
+   */
+  preferredContextEngine: 'auggie' | 'claude-code' | 'pi' | 'opencode' | 'codex' | 'gemini' | 'llama';
+
+  /**
+   * List of reviewer tools that vote on solutions.
+   * Each reviewer analyzes the generated solutions and casts votes.
+   * Default: ['gemini', 'codex']
+   */
+  reviewers: Array<'auggie' | 'claude-code' | 'pi' | 'opencode' | 'codex' | 'gemini' | 'llama'>;
+
+  /**
+   * Voting weight multipliers for each tool.
+   * The context engine typically has higher weight (e.g., 1.5).
+   * Default: { auggie: 1.5, gemini: 1.0, codex: 1.0 }
+   */
+  votingWeights: Record<string, number>;
+
+  /**
+   * Per-adapter configuration overrides.
+   * Key is the tool name, value is the adapter-specific config.
+   */
+  adapters?: Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Default tools configuration.
+ */
+export const DEFAULT_TOOLS_CONFIG: ToolsConfig = {
+  preferredContextEngine: 'auggie',
+  reviewers: ['gemini', 'codex'],
+  votingWeights: {
+    auggie: 1.5,
+    gemini: 1.0,
+    codex: 1.0,
+  },
+};
 
 /**
  * Result of a consensus debate (final output).

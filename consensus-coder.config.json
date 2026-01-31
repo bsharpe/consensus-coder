@@ -13,9 +13,42 @@
     "maxDelayMs": 60000,
     "backoffMultiplier": 2
   },
-  "auggie": {
-    "path": "auggie",
-    "timeout": 300000
+  "tools": {
+    "preferredContextEngine": "auggie",
+    "reviewers": ["gemini", "codex"],
+    "votingWeights": {
+      "auggie": 1.5,
+      "gemini": 1.0,
+      "codex": 1.0
+    },
+    "adapters": {
+      "auggie": {
+        "path": "auggie",
+        "timeout": 300000
+      },
+      "gemini": {
+        "model": "gemini-2.0-flash",
+        "timeout": 60000
+      },
+      "codex": {
+        "model": "gpt-4o",
+        "timeout": 60000
+      },
+      "claude-code": {
+        "model": "claude-sonnet-4-20250514",
+        "timeout": 60000
+      },
+      "pi": {
+        "timeout": 60000
+      },
+      "opencode": {
+        "timeout": 60000
+      },
+      "llama": {
+        "model": "llama-3.1-70b",
+        "timeout": 60000
+      }
+    }
   },
   "models": {
     "opus": "anthropic/claude-opus-4-5",

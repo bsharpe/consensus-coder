@@ -7,7 +7,9 @@
 
 ## Overview
 
-Consensus Coder leverages multiple AI models to debate and reach consensus on complex coding challenges. By combining the strengths of different models (Claude Opus for diagnosis, Gemini + Codex for review), the skill produces more robust, well-reasoned solutions than any single model could generate alone.
+Consensus Coder orchestrates **multiple AI coding tools** to debate and reach consensus on complex coding challenges. By combining different tools' strengths — a **context engine** (like Auggie) understands your codebase and generates solutions, while **reviewers** (like Gemini and Codex) independently evaluate those solutions — you get robust, well-reasoned decisions grounded in your actual code.
+
+The system is **tool-agnostic**: you choose which tools participate (Auggie, Claude Code, Pi, OpenCode, Codex, Gemini, Llama, etc.), and each tool brings its own context understanding and reasoning style to the debate.
 
 ### Key Features
 
@@ -251,13 +253,13 @@ const spec = await coder.getConsensusSpec(result.debateId);
 
 ```mermaid
 graph TD
-    A["📥 Problem Intake"] --> B["🤖 Opus Diagnosis"]
-    B --> C["📋 3 Proposed Approaches"]
+    A["📥 Problem Intake"] --> B["🔧 Context Engine<br/>(Configurable: Auggie, Claude Code, Pi, etc.)"]
+    B --> C["📋 3 Proposed Approaches<br/>(Grounded in Your Codebase)"]
     C --> D{{"🔄 Round Loop<br/>Max 5 Iterations"}}
     
-    D --> E["🔍 Gemini Reviews<br/>Approach A, B, C"]
-    E --> F["🔍 Codex Reviews<br/>Approach A, B, C"]
-    F --> G["📊 Synthesis Engine<br/>Calculate Confidence<br/>Score Approaches"]
+    D --> E["🔍 Reviewer #1<br/>(Configurable Tool)<br/>Analyzes & Votes"]
+    E --> F["🔍 Reviewer #2<br/>(Configurable Tool)<br/>Analyzes & Votes"]
+    F --> G["📊 Synthesis Engine<br/>Apply Voting Weights<br/>Score Approaches"]
     
     G --> H{{"Uncertainty<br/>Below Threshold?"}}
     H -->|Yes| D
@@ -273,7 +275,7 @@ graph TD
     
     L --> N["📄 Spec Output<br/>Problem + All Approaches<br/>+ Winner + Acceptance Criteria"]
     
-    N --> O{{"Choose Agent"}}
+    N --> O{{"Choose Implementation Agent"}}
     O -->|Claude Code| P["claude exec --file spec.md"]
     O -->|Auggie| Q["auggie --instruction-file spec.md"]
     O -->|Pi Agent| R["pi --prompt spec.md"]
@@ -286,6 +288,93 @@ graph TD
     
     T --> U["✨ Done"]
 ```
+
+## Tool Configuration System
+
+Consensus Coder is **tool-agnostic**: you choose which AI coding tools participate in the debate. The system separates roles:
+
+- **Context Engine** — One tool that understands your codebase and generates 3 solution proposals
+  - Default: `auggie` (has built-in codebase analysis)
+  - Also available: `claude-code`, `pi`, `opencode`, `codex`, `gemini`, `llama`
+
+- **Reviewers** — One or more tools that independently analyze and vote on the proposals
+  - Default: `gemini`, `codex`
+  - Can be any tool: `auggie`, `opencode`, `pi`, `claude-code`, etc.
+
+- **Voting Weights** — Configure how much each tool's vote counts
+  - Context engine gets extra weight (knows your code)
+  - Customize reviewers' influence
+
+### Configure Tools
+
+**In config file** (`consensus-coder.config.json`):
+```json
+{
+  "tools": {
+    "preferredContextEngine": "auggie",
+    "reviewers": ["gemini", "codex"],
+    "votingWeights": {
+      "auggie": 1.5,
+      "gemini": 1.0,
+      "codex": 1.0
+    }
+  }
+}
+```
+
+**Via CLI flags**:
+```bash
+npm start -- --problem "Design X" \
+  --use-adapters \
+  --context-engine auggie \
+  --reviewers gemini,codex,opencode \
+  --weights "auggie:2.0,gemini:1.0,codex:0.8"
+```
+
+**Programmatically**:
+```typescript
+const result = await coder.startConsensus({
+  problem: 'Your problem here',
+  config: {
+    useToolAdapters: true,
+    tools: {
+      preferredContextEngine: 'auggie',
+      reviewers: ['gemini', 'codex'],
+      votingWeights: { auggie: 1.5, gemini: 1.0, codex: 1.0 }
+    }
+  }
+});
+```
+
+### Available Tools
+
+| Tool | Best For | Context Engine | Reviewer |
+|------|----------|---|---|
+| **Auggie** | Deep codebase analysis | ✅ (excellent) | ✅ (good) |
+| **Claude Code** | General reasoning | ✅ (good) | ✅ (excellent) |
+| **Gemini** | Fast evaluation | ❌ | ✅ (very good) |
+| **Codex** | Code-specific reasoning | ✅ (good) | ✅ (very good) |
+| **Pi** | Architectural thinking | ✅ (good) | ✅ (good) |
+| **OpenCode** | Custom workflows | ✅ (configurable) | ✅ (configurable) |
+| **Llama** | Self-hosted option | ✅ (configurable) | ✅ (configurable) |
+
+### Example: Custom Tool Setup
+
+**Use Claude Code for context analysis, Auggie + Gemini for review:**
+```bash
+npm start -- --problem "Add caching layer" \
+  --use-adapters \
+  --context-engine claude-code \
+  --reviewers auggie,gemini \
+  --weights "claude-code:1.5,auggie:1.2,gemini:1.0"
+```
+
+This workflow:
+1. Claude Code analyzes your codebase, proposes 3 caching strategies
+2. Auggie reviews proposals (knows how to implement in your stack)
+3. Gemini reviews proposals (checks for best practices)
+4. Weighted votes determine winner
+5. Consensus spec generated, ready for any implementation agent
 
 ## API Reference
 
@@ -905,6 +994,17 @@ MIT — See [LICENSE](LICENSE) for details.
 - **Clawdbot Community**: [Discord](https://discord.gg/clawdbot)
 
 ## Changelog
+
+### v1.2.0 (2026-01-31)
+
+- ✨ **Major Feature:** Configurable tool system for context engines and reviewers
+- ✅ Tool adapters: Support Auggie, Claude Code, Gemini, Codex, Pi, OpenCode, Llama
+- ✅ Flexible architecture: Choose which tools participate in debate
+- ✅ Voting weights: Configure influence of each tool
+- ✅ CLI flags: `--use-adapters`, `--context-engine`, `--reviewers`, `--weights`
+- ✅ Backward compatible: Legacy opus/gemini/codex flow still works as default
+- ✅ 50+ unit tests passing with full coverage
+- ✅ New "Tool Configuration System" documentation
 
 ### v1.1.0 (2026-01-31)
 

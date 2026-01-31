@@ -39,6 +39,7 @@ import {
   DebateState,
   ConsensusCoderConfig,
   DEBATE_CONSTRAINTS,
+  ToolsConfig,
 } from './types/consensus-types.js';
 
 // ============================================================================
@@ -339,7 +340,11 @@ export class ConsensusCoder {
    * );
    * ```
    */
-  async startConsensus(problem: string, context?: string): Promise<string> {
+  async startConsensus(
+    problem: string,
+    context?: string,
+    config?: { tools?: ToolsConfig; useToolAdapters?: boolean }
+  ): Promise<string> {
     this.ensureInitialized();
 
     if (!problem || problem.trim().length === 0) {
@@ -353,15 +358,18 @@ export class ConsensusCoder {
       debateId,
       problemLength: problem.length,
       hasContext: contextStr.length > 0,
+      useToolAdapters: config?.useToolAdapters ?? false,
     });
 
-    // Create orchestrator
+    // Create orchestrator with optional tool adapter configuration
     const consensusConfig: Partial<ConsensusConfig> = {
       maxIterations: 5,
       votingThreshold: 75,
       uncertaintyThreshold: 30,
       requestTimeout: 60000,
       retryAttempts: 2,
+      tools: config?.tools,
+      useToolAdapters: config?.useToolAdapters,
     };
 
     const orchestrator = new ConsensusOrchestrator(problem, contextStr, consensusConfig);

@@ -21,6 +21,8 @@ import { table } from 'table';
 import * as readline from 'readline';
 import { ConsensusCoder, createConsensusCoder } from '../consensus-coder.skill.js';
 import { StateStore } from '../persistence/state-store.js';
+import { ToolsConfig, DEFAULT_TOOLS_CONFIG } from '../types/consensus-types.js';
+import { ToolName } from '../tools/tool-adapter.js';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -30,7 +32,14 @@ interface CLIContext {
   coder: ConsensusCoder;
   store: StateStore;
   debug: boolean;
+  toolsConfig?: ToolsConfig;
+  useToolAdapters?: boolean;
 }
+
+/**
+ * Supported tool names for CLI validation
+ */
+const VALID_TOOL_NAMES: ToolName[] = ['auggie', 'claude-code', 'pi', 'opencode', 'codex', 'gemini', 'llama'];
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -161,6 +170,42 @@ async function commandStart(argv: any, ctx: CLIContext): Promise<void> {
   const context: string | undefined = argv.context;
   const interactive: boolean = argv.interactive || false;
   const silent: boolean = argv.silent || false;
+  const useAdapters: boolean = argv['use-adapters'] || false;
+  const contextEngine: string = argv['context-engine'] || 'auggie';
+  const reviewersStr: string = argv.reviewers || 'gemini,codex';
+  const weightsStr: string | undefined = argv.weights;
+
+  // Parse reviewers from comma-separated string
+  const reviewers = reviewersStr.split(',').map((r: string) => r.trim()).filter((r: string) => r.length > 0) as ToolName[];
+
+  // Validate reviewers
+  for (const reviewer of reviewers) {
+    if (!VALID_TOOL_NAMES.includes(reviewer)) {
+      printError(`Invalid reviewer: ${reviewer}. Valid options: ${VALID_TOOL_NAMES.join(', ')}`);
+      process.exit(1);
+    }
+  }
+
+  // Parse voting weights if provided
+  let votingWeights: Record<string, number> = { ...DEFAULT_TOOLS_CONFIG.votingWeights };
+  if (weightsStr) {
+    try {
+      const parsed = JSON.parse(weightsStr);
+      votingWeights = { ...votingWeights, ...parsed };
+    } catch (error) {
+      printError(`Invalid weights JSON: ${weightsStr}`);
+      process.exit(1);
+    }
+  }
+
+  // Build tools config if using adapters
+  const toolsConfig: ToolsConfig | undefined = useAdapters
+    ? {
+        preferredContextEngine: contextEngine as ToolName,
+        reviewers: reviewers as Array<typeof VALID_TOOL_NAMES[number]>,
+        votingWeights,
+      }
+    : undefined;
 
   if (!silent) {
     printHeader('Starting Consensus Debate');
@@ -168,10 +213,14 @@ async function commandStart(argv: any, ctx: CLIContext): Promise<void> {
     if (context) {
       printInfo(`Context: ${context.substring(0, 100)}${context.length > 100 ? '...' : ''}`);
     }
+    if (useAdapters) {
+      printInfo(`Using tool adapters: context-engine=${contextEngine}, reviewers=[${reviewers.join(', ')}]`);
+    }
   }
 
   try {
-    const debateId = await ctx.coder.startConsensus(problem, context);
+    // Pass tools config to startConsensus if using adapters
+    const debateId = await ctx.coder.startConsensus(problem, context, useAdapters ? { tools: toolsConfig, useToolAdapters: true } : undefined);
 
     if (!silent) {
       printSuccess(`Debate started successfully`);
@@ -461,6 +510,30 @@ async function main(): Promise<void> {
             describe: 'Only output the debate ID',
             type: 'boolean',
             default: false,
+          })
+          .option('use-adapters', {
+            alias: 'u',
+            describe: 'Use new tool adapter system instead of legacy opus/gemini/codex',
+            type: 'boolean',
+            default: false,
+          })
+          .option('context-engine', {
+            alias: 'e',
+            describe: 'Tool to use as context engine (auggie, claude-code, pi, opencode, codex, gemini, llama)',
+            type: 'string',
+            default: 'auggie',
+            choices: VALID_TOOL_NAMES,
+          })
+          .option('reviewers', {
+            alias: 'r',
+            describe: 'Comma-separated list of reviewer tools (e.g., gemini,codex)',
+            type: 'string',
+            default: 'gemini,codex',
+          })
+          .option('weights', {
+            alias: 'w',
+            describe: 'Voting weights as JSON (e.g., {"auggie":1.5,"gemini":1.0})',
+            type: 'string',
           }),
       (argv) => commandStart(argv as any, ctx),
     )

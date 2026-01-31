@@ -33,7 +33,21 @@ import {
   ModelRole,
   ConsensusCoderConfig,
   DEBATE_CONSTRAINTS,
+  ToolsConfig,
+  DEFAULT_TOOLS_CONFIG,
 } from './types/consensus-types.js';
+
+import {
+  ToolAdapter,
+  ToolName,
+  ToolSolution,
+  ToolVote,
+  ToolGenerateRequest,
+  ToolReviewRequest,
+  ToolConfig,
+} from './tools/tool-adapter.js';
+
+import { ToolRegistry, toolRegistry } from './tools/tool-registry.js';
 
 // ============================================================================
 // CONSTANTS
@@ -94,6 +108,19 @@ export interface ConsensusConfig {
    * Default: 2
    */
   retryAttempts: number;
+
+  /**
+   * Tools configuration for context engine and reviewers.
+   * Allows configuring which tools participate in the debate.
+   */
+  tools?: ToolsConfig;
+
+  /**
+   * Whether to use the new tool adapter system.
+   * When true, uses ToolRegistry for context engine and reviewers.
+   * When false (default), uses legacy opus/gemini/codex flow.
+   */
+  useToolAdapters?: boolean;
 }
 
 /**
@@ -146,6 +173,12 @@ export class ConsensusOrchestrator {
   private readonly state: OrchestrationState;
   private debateState: DebateState;
   private readonly debateId: string;
+
+  // Tool adapter system properties
+  private readonly toolRegistry: ToolRegistry;
+  private readonly toolsConfig: ToolsConfig;
+  private contextEngine?: ToolAdapter;
+  private reviewers: ToolAdapter[] = [];
 
   /**
    * Constructor initializes debate parameters and default state.
@@ -209,10 +242,80 @@ export class ConsensusOrchestrator {
       version: '1.0',
     };
 
+    // Initialize tool adapter system
+    this.toolsConfig = this.config.tools ?? DEFAULT_TOOLS_CONFIG;
+    this.toolRegistry = toolRegistry;
+
     this.logInfo(
       `Debate initialized: ${this.debateId}`,
       `Max rounds: ${this.config.maxIterations}, Voting threshold: ${this.config.votingThreshold}%`
     );
+
+    // Initialize tool adapters if using the new system
+    if (this.config.useToolAdapters) {
+      this.initializeToolAdapters().catch((error) => {
+        this.logError('Failed to initialize tool adapters', error);
+      });
+    }
+  }
+
+  /**
+   * Initialize tool adapters based on configuration.
+   * Called automatically when useToolAdapters is true.
+   */
+  private async initializeToolAdapters(): Promise<void> {
+    try {
+      // Register default adapters if not already registered
+      if (this.toolRegistry.getRegisteredNames().length === 0) {
+        this.toolRegistry.registerDefaults();
+      }
+
+      // Get context engine adapter
+      const contextEngineName = this.toolsConfig.preferredContextEngine as ToolName;
+      this.contextEngine = this.toolRegistry.getAdapter(contextEngineName);
+
+      if (!this.contextEngine) {
+        // Create and register if not found
+        const adapter = ToolRegistry.createAdapter(contextEngineName, 'context-engine');
+        this.toolRegistry.registerAdapter(adapter);
+        this.contextEngine = adapter;
+      }
+
+      // Initialize context engine with config from adapters config
+      const contextEngineConfig: ToolConfig = {
+        name: contextEngineName,
+        ...this.toolsConfig.adapters?.[contextEngineName],
+      };
+      await this.contextEngine.initialize(contextEngineConfig);
+
+      // Get reviewer adapters
+      this.reviewers = [];
+      for (const reviewerName of this.toolsConfig.reviewers) {
+        let reviewer = this.toolRegistry.getAdapter(reviewerName as ToolName);
+
+        if (!reviewer) {
+          // Create and register if not found
+          const adapter = ToolRegistry.createAdapter(reviewerName as ToolName, 'reviewer');
+          this.toolRegistry.registerAdapter(adapter);
+          reviewer = adapter;
+        }
+
+        // Initialize reviewer with config
+        const reviewerConfig: ToolConfig = {
+          name: reviewerName as ToolName,
+          ...this.toolsConfig.adapters?.[reviewerName],
+        };
+        await reviewer.initialize(reviewerConfig);
+        this.reviewers.push(reviewer);
+      }
+
+      this.logInfo(
+        `Tool adapters initialized: context engine=${contextEngineName}, reviewers=[${this.toolsConfig.reviewers.join(', ')}]`
+      );
+    } catch (error) {
+      this.logError('Error initializing tool adapters', error);
+      throw error;
+    }
   }
 
   // =========================================================================
@@ -392,6 +495,11 @@ export class ConsensusOrchestrator {
    * @returns Promise<DebateRound> - Round data with all responses and synthesis
    */
   private async executeRound(iteration: number): Promise<DebateRound> {
+    // Use tool adapters if enabled
+    if (this.config.useToolAdapters && this.contextEngine) {
+      return this.executeRoundWithToolAdapters(iteration);
+    }
+
     const roundStartMs = Date.now();
 
     try {
@@ -505,6 +613,290 @@ export class ConsensusOrchestrator {
         },
       };
     }
+  }
+
+  /**
+   * Execute a debate round using the tool adapter system.
+   *
+   * This method uses the configured context engine to generate solutions
+   * and the configured reviewers to vote on them.
+   *
+   * Steps:
+   * 1. Context engine generates 3 solutions
+   * 2. Each reviewer votes on the solutions
+   * 3. Apply voting weights
+   * 4. Synthesize results into DebateRound format
+   *
+   * @param iteration - Current round number (1-5)
+   * @returns Promise<DebateRound> - Round data with all responses and synthesis
+   */
+  private async executeRoundWithToolAdapters(iteration: number): Promise<DebateRound> {
+    const roundStartMs = Date.now();
+
+    try {
+      this.logInfo(`Round ${iteration}: using tool adapters (context engine: ${this.toolsConfig.preferredContextEngine})`);
+
+      // Build request for context engine
+      const previousRoundSummary = iteration > 1 && this.state.lastSynthesis
+        ? `Previous round results: ${this.state.lastSynthesis.rankedSolutions.map((sol) => sol.modelName).join(', ')}`
+        : undefined;
+
+      const generateRequest: ToolGenerateRequest = {
+        problem: this.problem,
+        context: this.context,
+        constraints: [],
+        previousRoundSynthesis: previousRoundSummary,
+        numSolutions: 3,
+      };
+
+      // Generate solutions from context engine
+      if (!this.contextEngine) {
+        throw new Error('Context engine not initialized');
+      }
+
+      this.logDebug(`Generating solutions with ${this.toolsConfig.preferredContextEngine}`);
+      const solutions = await this.contextEngine.generateSolutions(generateRequest);
+
+      this.logInfo(`Generated ${solutions.length} solutions from context engine`);
+
+      // Collect votes from reviewers
+      const reviewRequest: ToolReviewRequest = {
+        problem: this.problem,
+        context: this.context,
+        solutions,
+      };
+
+      // Collect votes in parallel from all reviewers
+      const votePromises = this.reviewers.map((reviewer) =>
+        reviewer.reviewSolutions(reviewRequest).catch((error) => {
+          this.logError(`Reviewer ${reviewer.name} failed`, error);
+          return null;
+        })
+      );
+
+      const votes = (await Promise.all(votePromises)).filter(
+        (v): v is ToolVote => v !== null
+      );
+
+      this.logInfo(`Collected ${votes.length}/${this.reviewers.length} reviewer votes`);
+
+      // Apply voting weights and calculate consensus
+      const weightedVotes = this.applyVotingWeights(votes);
+      const consensusResult = this.calculateConsensusFromVotes(solutions, weightedVotes);
+
+      // Convert to legacy DebateRound format for compatibility
+      const debateRound = this.convertToDebateRound(
+        iteration,
+        roundStartMs,
+        solutions,
+        votes,
+        consensusResult
+      );
+
+      return debateRound;
+    } catch (error) {
+      this.logError(`executeRoundWithToolAdapters(${iteration}) error`, error);
+
+      // Return error round
+      return {
+        roundNum: iteration,
+        timestamp: Date.now(),
+        opusProposal: this.createErrorResponse('opus'),
+        geminiCritique: this.createErrorResponse('gemini'),
+        codexRefinement: this.createErrorResponse('codex'),
+        ratings: this.createEmptyRatingMatrix(),
+        synthesis: this.createErrorSynthesis(iteration),
+        durationMs: Date.now() - roundStartMs,
+        apiCalls: {
+          opus: { tokens: 0, cost: 0 },
+          gemini: { tokens: 0, cost: 0 },
+          codex: { tokens: 0, cost: 0 },
+        },
+      };
+    }
+  }
+
+  /**
+   * Apply voting weights to reviewer votes.
+   *
+   * @param votes - Raw votes from reviewers
+   * @returns Weighted votes
+   */
+  private applyVotingWeights(votes: ToolVote[]): Array<ToolVote & { weight: number }> {
+    return votes.map((vote) => ({
+      ...vote,
+      weight: this.toolsConfig.votingWeights[vote.voterId] ?? 1.0,
+    }));
+  }
+
+  /**
+   * Calculate consensus from weighted votes.
+   *
+   * @param solutions - Generated solutions
+   * @param weightedVotes - Votes with weights applied
+   * @returns Consensus result with voting score and uncertainty
+   */
+  private calculateConsensusFromVotes(
+    solutions: ToolSolution[],
+    weightedVotes: Array<ToolVote & { weight: number }>
+  ): { votingScore: number; uncertaintyLevel: number; winningSolutionId: string | null } {
+    if (weightedVotes.length === 0) {
+      return { votingScore: 0, uncertaintyLevel: 100, winningSolutionId: null };
+    }
+
+    // Count weighted votes for each solution
+    const solutionScores: Record<string, number> = {};
+    let totalWeight = 0;
+
+    for (const vote of weightedVotes) {
+      const solutionId = vote.selectedSolutionId;
+      const weightedScore = vote.confidence * vote.weight;
+      solutionScores[solutionId] = (solutionScores[solutionId] || 0) + weightedScore;
+      totalWeight += vote.weight;
+    }
+
+    // Find winning solution
+    let winningSolutionId: string | null = null;
+    let maxScore = 0;
+
+    for (const [solutionId, score] of Object.entries(solutionScores)) {
+      if (score > maxScore) {
+        maxScore = score;
+        winningSolutionId = solutionId;
+      }
+    }
+
+    // Calculate voting score as percentage of max possible
+    const maxPossibleScore = totalWeight * 100; // confidence is 0-100
+    const votingScore = maxPossibleScore > 0 ? (maxScore / maxPossibleScore) * 100 : 0;
+
+    // Calculate uncertainty as inverse of agreement (variance of votes)
+    const avgConfidence = weightedVotes.reduce((sum, v) => sum + v.confidence, 0) / weightedVotes.length;
+    const uncertaintyLevel = 100 - avgConfidence;
+
+    return {
+      votingScore: Math.round(votingScore),
+      uncertaintyLevel: Math.round(uncertaintyLevel),
+      winningSolutionId,
+    };
+  }
+
+  /**
+   * Convert tool adapter results to legacy DebateRound format.
+   *
+   * @param iteration - Round number
+   * @param roundStartMs - Round start timestamp
+   * @param solutions - Generated solutions
+   * @param votes - Reviewer votes
+   * @param consensusResult - Calculated consensus
+   * @returns DebateRound compatible with legacy code
+   */
+  private convertToDebateRound(
+    iteration: number,
+    roundStartMs: number,
+    solutions: ToolSolution[],
+    votes: ToolVote[],
+    consensusResult: { votingScore: number; uncertaintyLevel: number; winningSolutionId: string | null }
+  ): DebateRound {
+    const durationMs = Date.now() - roundStartMs;
+
+    // Create ModelResponse from context engine solutions
+    const contextEngineResponse: ModelResponse = {
+      modelName: 'opus', // Map to legacy name
+      role: 'proposer',
+      content: solutions.map((s) => s.code).join('\n\n---\n\n'),
+      metadata: {
+        requestedAt: roundStartMs,
+        completedAt: Date.now(),
+        inputTokens: 500, // Estimate
+        outputTokens: solutions.reduce((sum, s) => sum + (s.code?.length || 0) / 4, 0),
+        modelVersion: this.toolsConfig.preferredContextEngine,
+      },
+    };
+
+    // Create ModelResponse from reviewer votes
+    const reviewerResponses: ModelResponse[] = votes.map((vote, i) => ({
+      modelName: (i === 0 ? 'gemini' : 'codex') as ModelName, // Map to legacy names
+      role: (i === 0 ? 'critic' : 'refiner') as ModelRole,
+      content: vote.reasoning,
+      metadata: {
+        requestedAt: roundStartMs,
+        completedAt: Date.now(),
+        inputTokens: 300,
+        outputTokens: vote.reasoning.length / 4,
+        modelVersion: vote.voterId,
+      },
+    }));
+
+    // Ensure we have at least 2 reviewer responses
+    while (reviewerResponses.length < 2) {
+      reviewerResponses.push(this.createErrorResponse(reviewerResponses.length === 0 ? 'gemini' : 'codex'));
+    }
+
+    // Determine best proposal from votes
+    const bestSolution = consensusResult.winningSolutionId
+      ? solutions.find((s) => s.solutionId === consensusResult.winningSolutionId) ?? solutions[0]
+      : solutions[0];
+
+    // Build synthesis result matching SynthesisResult interface
+    const synthesis: SynthesisResult = {
+      roundNum: iteration,
+      votes: {
+        bestProposal: bestSolution?.name ?? 'opus',
+        voteCount: {
+          opus: votes.filter((v) => v.selectedSolutionId === solutions[0]?.solutionId).length,
+          gemini: votes.filter((v) => v.selectedSolutionId === solutions[1]?.solutionId).length,
+          codex: votes.filter((v) => v.selectedSolutionId === solutions[2]?.solutionId).length,
+        },
+        consensus: votes.length > 0 && votes.every((v) => v.selectedSolutionId === votes[0].selectedSolutionId),
+      },
+      votingScore: consensusResult.votingScore,
+      uncertaintyLevel: consensusResult.uncertaintyLevel,
+      rankedSolutions: solutions.map((sol, index) => ({
+        modelName: sol.name,
+        score: sol.confidence ?? 80 - index * 10,
+        rank: index + 1,
+        confidence: sol.confidence ?? 70,
+        keyStrengths: sol.tradeoffs.length > 0 ? sol.tradeoffs.slice(0, 2) : ['Clear implementation'],
+        keyWeaknesses: sol.risks.length > 0 ? sol.risks.slice(0, 2) : [],
+      })),
+      convergenceAnalysis: {
+        isConverging: consensusResult.votingScore >= 50,
+        predictedConvergenceRound: consensusResult.votingScore >= 75 ? iteration : iteration + 1,
+        trendFromPreviousRound: 'improving' as const,
+      },
+      opusSynthesis: `Round ${iteration} synthesis: Best solution is ${bestSolution?.name}. ` +
+        `Voting score: ${consensusResult.votingScore}%, Uncertainty: ${consensusResult.uncertaintyLevel}%`,
+      metadata: {
+        synthesizedAt: Date.now(),
+        synthesizedBy: 'opus-model',
+      },
+    };
+
+    return {
+      roundNum: iteration,
+      timestamp: roundStartMs,
+      opusProposal: contextEngineResponse,
+      geminiCritique: reviewerResponses[0],
+      codexRefinement: reviewerResponses[1],
+      ratings: this.buildRatingMatrix([contextEngineResponse, ...reviewerResponses]),
+      synthesis,
+      durationMs,
+      apiCalls: {
+        opus: {
+          tokens: contextEngineResponse.metadata.inputTokens + contextEngineResponse.metadata.outputTokens,
+          cost: 0.01, // Estimate
+        },
+        gemini: {
+          tokens: reviewerResponses[0].metadata.inputTokens + reviewerResponses[0].metadata.outputTokens,
+          cost: 0.005,
+        },
+        codex: {
+          tokens: reviewerResponses[1].metadata.inputTokens + reviewerResponses[1].metadata.outputTokens,
+          cost: 0.01,
+        },
+      },
+    };
   }
 
   /**
